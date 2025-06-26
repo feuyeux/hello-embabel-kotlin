@@ -22,8 +22,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
-@EnableAgentShell
-@EnableAgents(loggingTheme = LoggingThemes.STAR_WARS)
+@EnableAgents
 class ProjectNameApplication
 
 fun main(args: Array<String>) {
