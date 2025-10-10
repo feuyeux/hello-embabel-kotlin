@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!-- 
+    常见抑制规则示例 - 根据实际需要调整
+    -->
+    
+    <!-- 抑制测试依赖的漏洞（测试环境不影响生产安全） -->
+    <suppress>
+        <notes><![CDATA[
+        测试依赖，仅在测试环境使用，不会部署到生产环境
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.junit/.*@.*$</packageUrl>
+    </suppress>
+    
+    <suppress>
+        <notes><![CDATA[
+        MockK测试框架，仅测试时使用
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.mockk/.*@.*$</packageUrl>
+    </suppress>
+    
+    <!-- 示例：抑制特定CVE（当确认不影响项目时） -->
+    <!--
+    <suppress>
+        <notes><![CDATA[
+        CVE-2023-xxxxx: 此漏洞仅影响特定配置，我们的使用场景不受影响
+        参考: https://github.com/advisories/GHSA-xxxx
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework/spring-web@.*$</packageUrl>
+        <cve>CVE-2023-xxxxx</cve>
+    </suppress>
+    -->
+    
+    <!-- 示例：抑制开发工具的漏洞 -->
+    <!--
+    <suppress>
+        <notes><![CDATA[
+        开发工具依赖，不会打包到最终产品中
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-compiler.*@.*$</packageUrl>
+    </suppress>
+    -->
+</suppressions>
