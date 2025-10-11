@@ -66,21 +66,40 @@ jobs:
           CURRENT_VERSION=$(mvn help:evaluate -Dexpression=embabel-agent.version -q -DforceStdout)
           echo "当前版本: $CURRENT_VERSION"
           
-          # 检查可用版本
-          mvn versions:display-dependency-updates -Dincludes=com.embabel.agent:* > dependency-updates.log 2>&1 || true
+          # 清理SNAPSHOT缓存并强制刷新
+          echo "清理SNAPSHOT缓存..."
+          mvn dependency:purge-local-repository -Dincludes=com.embabel.agent:* -DreResolve=false -q
           
-          # 检查是否有更新
-          if grep -q "com.embabel.agent" dependency-updates.log; then
-            echo "发现embabel依赖更新"
+          # 获取当前SNAPSHOT的时间戳
+          echo "获取当前SNAPSHOT时间戳..."
+          CURRENT_TIMESTAMP=""
+          if [ -f ~/.m2/repository/com/embabel/agent/embabel-agent-starter/0.1.0-SNAPSHOT/maven-metadata-embabel-snapshots.xml ]; then
+            CURRENT_TIMESTAMP=$(grep -o '<timestamp>[^<]*</timestamp>' ~/.m2/repository/com/embabel/agent/embabel-agent-starter/0.1.0-SNAPSHOT/maven-metadata-embabel-snapshots.xml | head -1 | sed 's/<[^>]*>//g' || echo "")
+          fi
+          echo "当前时间戳: $CURRENT_TIMESTAMP"
+          
+          # 强制刷新SNAPSHOT元数据
+          echo "强制刷新SNAPSHOT元数据..."
+          mvn dependency:resolve -Dincludes=com.embabel.agent:* -U -q
+          
+          # 获取新的时间戳
+          NEW_TIMESTAMP=""
+          if [ -f ~/.m2/repository/com/embabel/agent/embabel-agent-starter/0.1.0-SNAPSHOT/maven-metadata-embabel-snapshots.xml ]; then
+            NEW_TIMESTAMP=$(grep -o '<timestamp>[^<]*</timestamp>' ~/.m2/repository/com/embabel/agent/embabel-agent-starter/0.1.0-SNAPSHOT/maven-metadata-embabel-snapshots.xml | head -1 | sed 's/<[^>]*>//g' || echo "")
+          fi
+          echo "新时间戳: $NEW_TIMESTAMP"
+          
+          # 比较时间戳判断是否有更新
+          if [ -n "$NEW_TIMESTAMP" ] && [ "$NEW_TIMESTAMP" != "$CURRENT_TIMESTAMP" ]; then
+            echo "发现新的SNAPSHOT构建: $NEW_TIMESTAMP"
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            
-            # 提取最新版本信息
-            LATEST_INFO=$(grep -A 2 "com.embabel.agent" dependency-updates.log | head -3)
-            echo "latest_info<<EOF" >> $GITHUB_OUTPUT
-            echo "$LATEST_INFO" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "latest_info=新SNAPSHOT构建时间: $NEW_TIMESTAMP" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.force_update }}" = "true" ]; then
+            echo "强制更新模式"
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "latest_info=强制更新SNAPSHOT依赖" >> $GITHUB_OUTPUT
           else
-            echo "没有发现embabel依赖更新"
+            echo "没有发现新的SNAPSHOT构建"
             echo "has_updates=false" >> $GITHUB_OUTPUT
           fi
         env:
@@ -88,25 +107,26 @@ jobs:
           EMBABEL_REPO_PASSWORD: ${{ secrets.EMBABEL_REPO_PASSWORD }}
       
       - name: Update embabel dependencies
-        if: steps.check-updates.outputs.has_updates == 'true' || github.event.inputs.force_update == 'true'
+        if: steps.check-updates.outputs.has_updates == 'true'
         run: |
           echo "更新embabel依赖..."
           
-          # 更新到最新SNAPSHOT版本
-          mvn versions:use-latest-snapshots -Dincludes=com.embabel.agent:*
+          # 清理并重新下载SNAPSHOT依赖
+          mvn dependency:purge-local-repository -Dincludes=com.embabel.agent:* -DreResolve=true
           
-          # 检查是否有实际变更
-          if git diff --quiet pom.xml; then
-            echo "没有实际的版本变更"
-            echo "no_changes=true" >> $GITHUB_ENV
-          else
-            echo "发现版本变更"
-            echo "no_changes=false" >> $GITHUB_ENV
-            
-            # 获取新版本
-            NEW_VERSION=$(mvn help:evaluate -Dexpression=embabel-agent.version -q -DforceStdout)
-            echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
-          fi
+          # 强制重新编译以确保使用最新SNAPSHOT
+          mvn clean compile -U
+          
+          # 记录更新信息
+          echo "no_changes=false" >> $GITHUB_ENV
+          
+          # 获取当前版本（虽然版本号可能相同，但SNAPSHOT内容已更新）
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=embabel-agent.version -q -DforceStdout)
+          echo "new_version=$CURRENT_VERSION" >> $GITHUB_ENV
+          
+          # 获取新的时间戳作为标识
+          NEW_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          echo "update_timestamp=$NEW_TIMESTAMP" >> $GITHUB_ENV
         env:
           EMBABEL_REPO_USERNAME: ${{ secrets.EMBABEL_REPO_USERNAME }}
           EMBABEL_REPO_PASSWORD: ${{ secrets.EMBABEL_REPO_PASSWORD }}
