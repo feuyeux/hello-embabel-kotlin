@@ -66,9 +66,14 @@ jobs:
           CURRENT_VERSION=$(mvn help:evaluate -Dexpression=embabel-agent.version -q -DforceStdout)
           echo "当前版本: $CURRENT_VERSION"
           
-          # 清理SNAPSHOT缓存并强制刷新
+          # 先确保能正常解析依赖
+          echo "验证依赖访问..."
+          mvn dependency:resolve -Dincludes=com.embabel.agent:* -q
+          
+          # 安全地清理SNAPSHOT缓存（不重新解析）
           echo "清理SNAPSHOT缓存..."
-          mvn dependency:purge-local-repository -Dincludes=com.embabel.agent:* -DreResolve=false -q
+          rm -rf ~/.m2/repository/com/embabel/agent/*/0.1.0-SNAPSHOT/maven-metadata-embabel-snapshots.xml || true
+          rm -rf ~/.m2/repository/com/embabel/common/*/0.1.0/maven-metadata-embabel-snapshots.xml || true
           
           # 获取当前SNAPSHOT的时间戳
           echo "获取当前SNAPSHOT时间戳..."
@@ -111,10 +116,14 @@ jobs:
         run: |
           echo "更新embabel依赖..."
           
-          # 清理并重新下载SNAPSHOT依赖
-          mvn dependency:purge-local-repository -Dincludes=com.embabel.agent:* -DreResolve=true
+          # 安全地清理SNAPSHOT缓存
+          echo "清理本地SNAPSHOT缓存..."
+          rm -rf ~/.m2/repository/com/embabel/agent/*/0.1.0-SNAPSHOT/*.jar || true
+          rm -rf ~/.m2/repository/com/embabel/agent/*/0.1.0-SNAPSHOT/*.pom || true
+          rm -rf ~/.m2/repository/com/embabel/common/*/0.1.0/*.jar || true
+          rm -rf ~/.m2/repository/com/embabel/common/*/0.1.0/*.pom || true
           
-          # 强制重新编译以确保使用最新SNAPSHOT
+          # 强制重新下载和编译
           mvn clean compile -U
           
           # 记录更新信息
