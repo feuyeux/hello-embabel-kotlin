@@ -25,7 +25,6 @@ import com.embabel.agent.domain.io.UserInput
 import com.embabel.agent.domain.library.HasContent
 import com.embabel.agent.prompt.persona.Persona
 import com.embabel.common.ai.model.LlmOptions
-import com.embabel.common.ai.model.ModelSelectionCriteria.Companion.Auto
 import com.embabel.common.core.types.Timestamped
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Profile
@@ -89,8 +88,8 @@ class WriteAndReviewAgent(
     @Action
     fun craftStory(userInput: UserInput): Story =
         using(
-            LlmOptions(criteria = Auto)
-                .withTemperature(.9), // Higher temperature for more creative output
+            LlmOptions()
+                .withTemperature(.9) // Higher temperature for more creative output
         ).withPromptContributor(StoryTeller)
             .create(
                 """
@@ -104,12 +103,12 @@ class WriteAndReviewAgent(
         """.trimIndent()
             )
 
-    @AchievesGoal("The user has been greeted")
+    @AchievesGoal(description = "The story has been crafted and reviewed by a book reviewer")
     @Action
     fun reviewStory(userInput: UserInput, story: Story, context: OperationContext): ReviewedStory {
-        val review = context.promptRunner(
-            LlmOptions(criteria = Auto)
-        ).withPromptContributor(Reviewer)
+        val review = context.promptRunner()
+            .withLlm(LlmOptions())
+            .withPromptContributor(Reviewer)
             .generateText(
                 """
             You will be given a short story to review.
