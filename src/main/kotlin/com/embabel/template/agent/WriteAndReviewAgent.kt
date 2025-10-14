@@ -18,14 +18,14 @@ package com.embabel.template.agent
 import com.embabel.agent.api.annotation.AchievesGoal
 import com.embabel.agent.api.annotation.Action
 import com.embabel.agent.api.annotation.Agent
-import com.embabel.agent.api.annotation.using
+import com.embabel.agent.api.annotation.Export
 import com.embabel.agent.api.common.OperationContext
 import com.embabel.agent.api.common.create
 import com.embabel.agent.domain.io.UserInput
 import com.embabel.agent.domain.library.HasContent
 import com.embabel.agent.prompt.persona.Persona
+import com.embabel.agent.prompt.persona.RoleGoalBackstory
 import com.embabel.common.ai.model.LlmOptions
-import com.embabel.common.ai.model.ModelSelectionCriteria.Companion.Auto
 import com.embabel.common.core.types.Timestamped
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Profile
@@ -33,11 +33,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-val StoryTeller = Persona(
-    name = "Roald Dahl",
-    persona = "A creative storyteller who loves to weave imaginative tales that are a bit unconventional",
-    voice = "Quirky",
-    objective = "Create memorable stories that captivate the reader's imagination.",
+val StoryTeller = RoleGoalBackstory(
+    role = "A creative storyteller who loves to weave imaginative tales that are a bit unconventional",
+    goal = "Create memorable stories that captivate the reader's imagination.",
+    backstory = "You have been crafting stories for as long as you can remember. Your tales often feature unexpected twists and unique characters that leave a lasting impression on your audience.",
 )
 
 val Reviewer = Persona(
@@ -82,16 +81,15 @@ data class ReviewedStory(
 )
 @Profile("!test")
 class WriteAndReviewAgent(
-    @Value("\${storyWordCount:100}") private val storyWordCount: Int,
-    @Value("\${reviewWordCount:100}") private val reviewWordCount: Int,
+    @param:Value("\${storyWordCount:100}") private val storyWordCount: Int,
+    @param:Value("\${reviewWordCount:100}") private val reviewWordCount: Int,
 ) {
 
     @Action
-    fun craftStory(userInput: UserInput): Story =
-        using(
-            LlmOptions(criteria = Auto)
-                .withTemperature(.9), // Higher temperature for more creative output
-        ).withPromptContributor(StoryTeller)
+    fun craftStory(userInput: UserInput, context: OperationContext): Story =
+        context.ai()
+            .withLlm(LlmOptions.withAutoLlm().withTemperature(0.7))
+            .withPromptContributor(StoryTeller)
             .create(
                 """
             Craft a short story in $storyWordCount words or less.
@@ -104,12 +102,15 @@ class WriteAndReviewAgent(
         """.trimIndent()
             )
 
-    @AchievesGoal("The user has been greeted")
+    @AchievesGoal(
+        description = "The user has been greeted",
+        export = Export(remote = true, name = "writeAndReviewStory")
+    )
     @Action
     fun reviewStory(userInput: UserInput, story: Story, context: OperationContext): ReviewedStory {
-        val review = context.promptRunner(
-            LlmOptions(criteria = Auto)
-        ).withPromptContributor(Reviewer)
+        val review = context.ai()
+            .withAutoLlm()
+            .withPromptContributor(Reviewer)
             .generateText(
                 """
             You will be given a short story to review.
